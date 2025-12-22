@@ -1,0 +1,10 @@
+ultralytics
+sentence-transformers
+opencv-python
+pillow
+tqdm
+rich
+sqlite-vec
+rembg
+onnxruntime
+pysqlite3-binary

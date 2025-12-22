@@ -1,6 +1,7 @@
 import random
 import cv2
 import numpy as np
+import torch  # Added to check for CUDA
 from pathlib import Path
 from ultralytics import YOLO
 from PIL import Image
@@ -9,12 +10,16 @@ from PIL import Image
 # CONFIG
 # =========================
 MODEL_PATH = Path("model.pt")
-INPUT_DIR  = Path("./test_input")
+INPUT_DIR  = Path("./my_test_album")
 OUTPUT_DIR = Path("./inference_outputs")
 
 NUM_RANDOM_IMAGES = 50
 CONF_THRESHOLD = 0.4
 OVERLAY_ALPHA = 0.25
+
+# DEVICE SELECTION: Use GPU if available, else CPU
+DEVICE = 0 if torch.cuda.is_available() else "cpu"
+print(f"Using device: {DEVICE}")
 
 OUTPUT_DIR.mkdir(exist_ok=True)
 
@@ -24,9 +29,6 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 def load_image_safe(path: Path):
     """
     Loads JPG / PNG / WEBP / BMP safely.
-    - Removes alpha channel
-    - Normalizes to RGB
-    - Converts to OpenCV BGR
     """
     img = Image.open(path).convert("RGB")
     img = np.array(img)
@@ -60,31 +62,29 @@ print(f"Running inference on {len(sample_images)} images")
 # =========================
 for img_path in sample_images:
 
-    # Load image safely (PNG alpha FIX)
+    # Load image safely
     img = load_image_safe(img_path)
 
-    # Run inference on the actual array
+    # Run inference using the detected DEVICE
     results = model(
         img,
         conf=CONF_THRESHOLD,
-        device=0,
+        device=DEVICE,  # Fixed: Now uses the dynamic device variable
         verbose=False
     )
 
     r = results[0]
-
-    # This image is now guaranteed to match box coordinates
     img = img.copy()
 
     if r.boxes is not None and len(r.boxes) > 0:
-
         overlay = img.copy()
 
         # =========================
         # FILL PHASE
         # =========================
         for box in r.boxes:
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            # Move box to CPU and convert to numpy for CV2 operations
+            x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
             cv2.rectangle(
                 overlay,
                 (x1, y1),
@@ -106,9 +106,10 @@ for img_path in sample_images:
         # BORDER + LABEL PHASE
         # =========================
         for box in r.boxes:
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            conf = float(box.conf[0])
-            cls_id = int(box.cls[0])
+            # Explicitly move data to CPU to avoid errors during CV2 drawing
+            x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
+            conf = float(box.conf[0].cpu().item())
+            cls_id = int(box.cls[0].cpu().item())
             label_name = r.names[cls_id]
 
             # Border

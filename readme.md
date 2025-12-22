@@ -2,7 +2,8 @@
 
 A lightweight command-line utility for stamp collectors to digitize, index, and search massive collections. This tool automates the tedious process of cropping individual stamps from full album scans and uses AI to make them searchable via text or image similarity.
 
----
+![segmenting stamps from album pages using AI](docs/sample_album_page.png)
+ 
 
 ## 🚀 What It Does
 
@@ -12,7 +13,7 @@ A lightweight command-line utility for stamp collectors to digitize, index, and 
 * **Natural Language Search:** Find stamps using text descriptions (e.g., "red triangular stamp" or "1 cent Washington").
 * **Lightweight CLI:** Designed for speed and ease of use on local hardware.
 
----
+ 
 
 ## 🛠 Installation & Setup
 
@@ -23,8 +24,12 @@ You will need Python 3.9+ and the `sqlite-vec` extension for vector search capab
 ### 2. Install Dependencies
 
 ```bash
-pip install ultralytics sentence-transformers opencv-python pillow tqdm rich sqlite-vec rembg
+sudo apt-get update
+sudo apt-get install -y libgl1
+```
 
+```bash
+pip install ultralytics sentence-transformers opencv-python pillow tqdm rich sqlite-vec rembg onnxruntime pysqlite3-binary
 ```
 
 ### 3. Required Files
@@ -38,12 +43,13 @@ On the first run, the script will generate a `philately.json` configuration file
 
 Prepare the database environment:
 
+
+
 ```bash
 python philately_tool.py init
-
 ```
 
----
+ 
 
 ## 📖 Usage
 
@@ -57,7 +63,6 @@ Running `index` processes every image in a folder, crops the stamps, and creates
 
 ```bash
 python philately_tool.py index ./path/to/my_india_2025_album
-
 ```
 
 #### 2. How the Mapping Works
@@ -75,7 +80,7 @@ Every time you run this command, the tool automatically parses your folder struc
 
 > **Pro Tip:** By indexing one album at a time, you ensure your search results can tell you exactly which physical book to pull off your shelf to find a specific stamp.
 
----
+ 
  
 
 ### Search by Image
@@ -84,7 +89,6 @@ Find a stamp's location using a reference photo:
 
 ```bash
 python philately_tool.py search_image my_stamp_photo.jpg --top 5
-
 ```
 
 ### Search by Text
@@ -93,7 +97,6 @@ Search your collection using natural language:
 
 ```bash
 python philately_tool.py search_text "purple 1890 postage"
-
 ```
 
 
@@ -107,17 +110,22 @@ When you perform a text or image search, the tool returns a ranked list of match
 | **Germany_Collection** | folder_02.jpeg | Germany_folder_02_seg6.png | 0.7592 |
 | **Germany_Collection** | folder_02.jpeg | Germany_folder_02_seg0.png | 0.7593 |
 
----
+ 
+
 
 > **Note on Distance:**
 > The **Distance** column represents the cosine distance between your search query and the stamp.
 > * A score closer to **0.0** is an exact or near-perfect match.
 > * A score closer to **1.0** indicates lower similarity.
 > 
-> 
 
 
----
+It is aslo possible to specify distance during search
+```bash
+python philately_tool.py search_text "purple 1890 postage" --distance 0.85
+```
+
+ 
 
 ## 🧠 Training the Model
 
@@ -129,7 +137,7 @@ The detection engine (YOLO) was trained using a specific hybrid methodology to h
 > [!WARNING]
 > The model is a work in progress. It may occasionally miss stamps or include parts of the album page in the crop.
 
----
+ 
 
 ## 🧪 Experimental: Background Removal
 
@@ -137,7 +145,6 @@ The tool includes a feature to remove the album page background entirely from th
 
 ```bash
 python philately_tool.py index ./path/to/scans --rembg
-
 ```
 
 **Note on Stability:**
@@ -145,14 +152,14 @@ The background removal feature is currently **highly unstable and experimental**
 
 
 
----
+ 
 
 ## ⚠️ Important Maintenance
 
 * **Database Integrity:** The SQLite database tracks the location of images in the `stamps/` folder. **If you manually delete or rename files in the stamps folder, you must manually fix your database.**
 * **Hardware:** Vector search and indexing are best performed on a machine with a dedicated GPU, though the tool will run on a standard CPU with a longer processing time.
 
----
+ 
 
  
 ## 💾 How to Backup
@@ -173,7 +180,6 @@ To back up your entire indexed collection, copy the following to your backup dri
 2. **Compress for storage:** It is recommended to zip the database and the stamps folder together to keep the versions synchronized.
 ```bash
 zip -r philately_backup_2025.zip philately.db stamps/ philately.json
-
 ```
 
 
@@ -187,7 +193,7 @@ To restore your collection on a new machine:
 3. Ensure your `best.pt` model file is in the path defined in your `philately.json`.
 4. Run a test search: `python philately_tool.py search_text "test"`.
 
----
+ 
 
 ### ⚠️ A Note on Data Integrity
 
@@ -197,7 +203,7 @@ The database uses **absolute mapping** based on the filenames.
 * **Do not rename** individual images inside the `stamps/` folder.
 If you need to reorganize your files, it is best to run the `init` command and re-index your albums to ensure the database remains accurate.
 
----
+ 
 
 **Would you like me to help you write a small shell script to automate this backup process daily?**
 
