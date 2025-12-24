@@ -29,12 +29,14 @@ jobs:
 
       - name: Build executable with PyInstaller
         run: |
-          pyinstaller --onefile --name your_app_name philately_tool_gui.py
+          pyinstaller --onefile --name philately_tool_gui philately_tool_gui.py
+
+      - name: Verify dist folder
+        run: dir dist
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          files: |
-            dist/philately_tool_gui.exe
+          files: dist/*.exe
