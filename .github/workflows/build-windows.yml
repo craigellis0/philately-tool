@@ -49,7 +49,8 @@ jobs:
             --name philately_tool_gui `
             --hidden-import sqlite_vec `
             --add-binary "${{ steps.sqlitevec.outputs.dll }};sqlite_vec" `
-            philately_tool_gui.py `
+            --add-data "model.pt;." `
+            philately_tool_gui.py `           
             --distpath dist `
             --workpath build
 
