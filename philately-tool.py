@@ -5,7 +5,7 @@ try:
 except ImportError:
     pass
 
-import sqlite3
+import sqlean as sqlite3  #update to work with macOS
 import argparse
 import json
 from pathlib import Path
@@ -119,7 +119,12 @@ def extract_stamps(album_folder, do_index=False, use_rembg=False):
         cur = conn.cursor()
 
     margin_pct = CFG["margin_percent"]
-    images = list(Path(album_folder).glob("*.*"))
+    
+    # ignore the macOS .DS_Store file
+    images = [
+        p for p in Path(album_folder).glob("*.*")
+        if p.name != ".DS_Store"
+    ]
 
     for img_path in tqdm(images, desc="Processing Album"):
         results = model(str(img_path), conf=CFG["yolo_conf"], verbose=False)[0]
