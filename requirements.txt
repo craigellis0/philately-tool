@@ -8,3 +8,4 @@ sqlite-vec
 rembg
 onnxruntime
 pysqlite3-binary
+sqlean.py
