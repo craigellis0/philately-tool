@@ -6,3 +6,4 @@ stamps
 .DS_Store
 input
 .vscode
+*.pyc

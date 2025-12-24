@@ -24,6 +24,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 from PIL import Image
+import inspect
 from tqdm import tqdm
 from rich.console import Console
 from rich.panel import Panel
@@ -128,6 +129,38 @@ def extract_stamps(
     on_error=None,
 ):
     try:
+        # Normalize callbacks: GUI may pass progress/status swapped positionally.
+        def _positional_params(fn):
+            try:
+                sig = inspect.signature(fn)
+                return len(
+                    [p for p in sig.parameters.values() if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
+                )
+            except Exception:
+                return None
+
+        if callable(on_status) and callable(on_progress):
+            a_status = _positional_params(on_status)
+            a_progress = _positional_params(on_progress)
+            # If they were swapped (progress fn provided where status expected)
+            if a_status == 2 and a_progress == 1:
+                on_status, on_progress = on_progress, on_status
+
+        # If only one callback provided but it looks like a progress function,
+        # move it to on_progress so status calls won't try to call it with a single arg.
+        if callable(on_status) and (on_progress is None):
+            a = _positional_params(on_status)
+            if a == 2:
+                on_progress = on_status
+                on_status = None
+
+        # If only on_progress provided but it looks like a status function, move it.
+        if callable(on_progress) and (on_status is None):
+            a = _positional_params(on_progress)
+            if a == 1:
+                on_status = on_progress
+                on_progress = None
+
         msg = f"Loading YOLO: {CFG['model_path']}"
         banner(msg)
         if on_status:

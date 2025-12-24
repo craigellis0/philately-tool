@@ -192,6 +192,9 @@ class PhilatelyApp(tk.Tk):
 
         self.album_list = tk.Listbox(left, width=40)
         self.album_list.pack(fill="both", expand=True)
+        # Right-click context menu to remove an accidentally added folder
+        self.album_list.bind("<Button-3>", self._on_album_right_click)
+        self._active_menu = None
 
         # Main
         main = ttk.Frame(self)
@@ -276,6 +279,70 @@ class PhilatelyApp(tk.Tk):
             self.album_dirs.append(d)
             self.album_list.insert("end", d)
 
+    def _on_album_right_click(self, event):
+        idx = self.album_list.nearest(event.y)
+        if idx is None:
+            return
+        # select the item under cursor
+        self.album_list.selection_clear(0, 'end')
+        self.album_list.selection_set(idx)
+
+        # destroy any previously-open menu
+        if getattr(self, "_active_menu", None):
+            try:
+                self._active_menu.destroy()
+            except Exception:
+                pass
+            self._active_menu = None
+
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Remove Folder", command=lambda i=idx: self._remove_folder(i))
+
+        # Track active menu so we can dismiss it when clicking elsewhere
+        self._active_menu = menu
+
+        def _dismiss_active_menu(event=None):
+            if getattr(self, "_active_menu", None):
+                try:
+                    self._active_menu.destroy()
+                except Exception:
+                    pass
+                self._active_menu = None
+            try:
+                self.unbind("<Button-1>")
+            except Exception:
+                pass
+
+        # Bind a one-shot left-click on the root window to dismiss the menu
+        self.bind("<Button-1>", _dismiss_active_menu)
+
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _remove_folder(self, idx):
+        try:
+            path = self.album_list.get(idx)
+        except Exception:
+            return
+        if not messagebox.askyesno("Confirm", f"Remove folder '{path}'?"):
+            return
+        if path in self.album_dirs:
+            self.album_dirs.remove(path)
+        self.album_list.delete(idx)
+        # ensure any active context menu is closed after removal
+        if getattr(self, "_active_menu", None):
+            try:
+                self._active_menu.destroy()
+            except Exception:
+                pass
+            self._active_menu = None
+            try:
+                self.unbind("<Button-1>")
+            except Exception:
+                pass
+
     def start_extraction(self):
         dlg = TaskDialog(self, "Extracting")
         threading.Thread(target=self._run_extraction, args=(dlg,), daemon=True).start()
@@ -284,7 +351,7 @@ class PhilatelyApp(tk.Tk):
         for d in self.album_dirs:
             if dlg.cancelled:
                 break
-            extract_stamps(d, True, False, dlg.set_progress, dlg.set_status)
+            extract_stamps(d, True, False, on_status=dlg.set_status, on_progress=dlg.set_progress)
         dlg.close()
         self.after(0, self.refresh_status_bar)
 
@@ -292,13 +359,31 @@ class PhilatelyApp(tk.Tk):
         dlg = SearchDialog(self)
         self.wait_window(dlg)
         if dlg.result:
-            rows = perform_search("text", dlg.result)
+            try:
+                top = int(self.ent_top.get())
+            except Exception:
+                top = CFG["default_top"]
+            try:
+                distance = float(self.ent_dist.get())
+            except Exception:
+                distance = CFG["default_distance"]
+
+            rows = perform_search("text", dlg.result, top, distance)
             self.display_results(rows)
 
     def search_by_image(self):
         img = filedialog.askopenfilename()
         if img:
-            rows = perform_search("image", img)
+            try:
+                top = int(self.ent_top.get())
+            except Exception:
+                top = CFG["default_top"]
+            try:
+                distance = float(self.ent_dist.get())
+            except Exception:
+                distance = CFG["default_distance"]
+
+            rows = perform_search("image", img, top, distance)
             self.display_results(rows)
 
     def refresh_status_bar(self):
