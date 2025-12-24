@@ -37,15 +37,8 @@ jobs:
         id: sqlitevec
         shell: pwsh
         run: |
-          $dll = python -c "
-import sqlite_vec, os, glob
-base = os.path.dirname(sqlite_vec.__file__)
-dlls = glob.glob(os.path.join(base, '*.dll'))
-if not dlls:
-    raise RuntimeError('sqlite_vec DLL not found')
-print(dlls[0])
-"
-          echo "dll=$dll" >> $env:GITHUB_OUTPUT
+          $dll = python -c 'import sqlite_vec, os, glob; base = os.path.dirname(sqlite_vec.__file__); dlls = glob.glob(os.path.join(base, "*.dll")); assert dlls, "sqlite_vec DLL not found"; print(dlls[0])'
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "dll=$dll"
 
       - name: Build executable with PyInstaller
         shell: pwsh
