@@ -16,6 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # IMPORTANT: sqlite-vec does NOT support Python 3.12
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -27,12 +28,36 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install --upgrade pyinstaller
+          pip install pyinstaller
           pip install ultralytics sentence-transformers opencv-python pillow tqdm rich sqlite-vec rembg onnxruntime
 
-      - name: Build executable with PyInstaller
+      # Locate sqlite_vec DLL and expose it for PyInstaller
+      - name: Locate sqlite_vec DLL
+        id: sqlitevec
+        shell: pwsh
         run: |
-          pyinstaller --onefile --name philately_tool_gui philately_tool_gui.py --distpath dist --workpath build
+          python - << 'EOF'
+          import sqlite_vec, os, glob
+          base = os.path.dirname(sqlite_vec.__file__)
+          dlls = glob.glob(os.path.join(base, "*.dll"))
+          if not dlls:
+              raise RuntimeError("sqlite_vec DLL not found")
+          print("DLL:", dlls[0])
+          print(f"::set-output name=dll::{dlls[0]}")
+          EOF
+
+      - name: Build executable with PyInstaller
+        shell: pwsh
+        run: |
+          pyinstaller `
+            --onefile `
+            --windowed `
+            --name philately_tool_gui `
+            --hidden-import sqlite_vec `
+            --add-binary "${{ steps.sqlitevec.outputs.dll }};sqlite_vec" `
+            philately_tool_gui.py `
+            --distpath dist `
+            --workpath build
 
       - name: Verify dist folder
         run: dir dist
