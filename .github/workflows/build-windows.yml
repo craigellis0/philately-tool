@@ -37,8 +37,16 @@ jobs:
         id: sqlitevec
         shell: pwsh
         run: |
-          $dll = python -c 'import sqlite_vec, os, glob; base = os.path.dirname(sqlite_vec.__file__); dlls = glob.glob(os.path.join(base, "*.dll")); assert dlls, "sqlite_vec DLL not found"; print(dlls[0])'
-          Add-Content -Path $env:GITHUB_OUTPUT -Value "dll=$dll"
+          $dll = python - << 'EOF'
+          import sqlite_vec, os, glob
+          base = os.path.dirname(sqlite_vec.__file__)
+          dlls = glob.glob(os.path.join(base, "*.dll"))
+          if not dlls:
+              raise RuntimeError("sqlite_vec DLL not found")
+          print(dlls[0])
+          EOF
+
+          "dll=$dll" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Build executable with PyInstaller
         shell: pwsh
@@ -50,7 +58,7 @@ jobs:
             --hidden-import sqlite_vec `
             --add-binary "${{ steps.sqlitevec.outputs.dll }};sqlite_vec" `
             --add-data "model.pt;." `
-            philately_tool_gui.py `           
+            philately_tool_gui.py `
             --distpath dist `
             --workpath build
 
