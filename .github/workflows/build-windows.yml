@@ -1,75 +1,59 @@
-name: Build Windows Executable
+steps:
+  - name: Checkout code
+    uses: actions/checkout@v4
 
-on:
-  push:
-    tags:
-      - "windows_v*"
+  # sqlite-vec supports Python <= 3.11 (consider switching to 3.11 if you hit install/runtime issues)
+  - name: Set up Python
+    uses: actions/setup-python@v5
+    with:
+      python-version: "3.12"
 
-permissions:
-  contents: write   # required to upload release assets
+  - name: Install Visual C++ Redistributable
+    run: choco install vcredist2015 -y
 
-jobs:
-  build-windows:
-    runs-on: windows-latest
+  - name: Install Python dependencies
+    shell: pwsh
+    run: |
+      python -m pip install --upgrade pip
+      pip install pyinstaller
+      pip install ultralytics sentence-transformers opencv-python pillow tqdm rich sqlite-vec rembg onnxruntime
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  # Locate sqlite_vec DLL and expose it for PyInstaller
+  - name: Locate sqlite_vec DLL
+    id: sqlitevec
+    shell: pwsh
+    run: |
+      # Get the DLL path from sqlite_vec
+      $dll = python -c "import sqlite_vec, os, glob; base = os.path.dirname(sqlite_vec.__file__); dlls = glob.glob(os.path.join(base, '*.dll')); assert dlls, 'sqlite_vec DLL not found'; print(dlls[0])"
 
-      # sqlite-vec supports Python <= 3.11
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+      # Trim any trailing newline
+      $dll = $dll.Trim()
 
-      - name: Install Visual C++ Redistributable
-        run: choco install vcredist2015 -y
+      # Export to GitHub Actions outputs
+      Add-Content -Path $env:GITHUB_OUTPUT -Value "dll=$dll"
 
-      - name: Install Python dependencies
-        shell: pwsh
-        run: |
-          python -m pip install --upgrade pip
-          pip install pyinstaller
-          pip install ultralytics sentence-transformers opencv-python pillow tqdm rich sqlite-vec rembg onnxruntime
+  - name: Build executable with PyInstaller
+    shell: pwsh
+    run: |
+      pyinstaller `
+        --onefile `
+        --windowed `
+        --name philately_tool_gui `
+        --hidden-import sqlite_vec `
+        --add-binary "${{ steps.sqlitevec.outputs.dll }};sqlite_vec" `
+        --add-data "model.pt;." `
+        philately_tool_gui.py `
+        --distpath dist `
+        --workpath build
 
-      # Locate sqlite_vec DLL and expose it for PyInstaller
-      - name: Locate sqlite_vec DLL
-        id: sqlitevec
-        shell: pwsh
-        run: |
-          $dll = python - << 'EOF'
-          import sqlite_vec, os, glob
-          base = os.path.dirname(sqlite_vec.__file__)
-          dlls = glob.glob(os.path.join(base, "*.dll"))
-          if not dlls:
-              raise RuntimeError("sqlite_vec DLL not found")
-          print(dlls[0])
-          EOF
+  - name: Verify dist folder
+    shell: pwsh
+    run: |
+      dir dist
 
-          "dll=$dll" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-
-      - name: Build executable with PyInstaller
-        shell: pwsh
-        run: |
-          pyinstaller `
-            --onefile `
-            --windowed `
-            --name philately_tool_gui `
-            --hidden-import sqlite_vec `
-            --add-binary "${{ steps.sqlitevec.outputs.dll }};sqlite_vec" `
-            --add-data "model.pt;." `
-            philately_tool_gui.py `
-            --distpath dist `
-            --workpath build
-
-      - name: Verify dist folder
-        shell: pwsh
-        run: |
-          dir dist
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          files: dist/*.exe
+  - name: Create GitHub Release
+    uses: softprops/action-gh-release@v2
+    with:
+      tag_name: ${{ github.ref_name }}
+      name: Release ${{ github.ref_name }}
+      files: dist/*.exe
